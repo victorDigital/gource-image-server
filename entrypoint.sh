@@ -64,19 +64,39 @@ render_image () {
   # Determine snapshot strategy (we only need a single representative frame, not an animation)
   local gource_extra_opts=""
   local start_position=""
+  # Validate percent mode input early (must be between 0 and 1, non-inclusive)
+  if [[ "$SNAPSHOT_MODE" == "percent" ]]; then
+    if [[ ! "$SNAPSHOT_POSITION" =~ ^0\.[0-9]+$ ]]; then
+      echo "[warn] SNAPSHOT_POSITION '$SNAPSHOT_POSITION' invalid. Using 0.9." >&2
+      SNAPSHOT_POSITION="0.9"
+    fi
+    # Disallow 0.0* and values that would effectively be 1.0
+    if [[ "$SNAPSHOT_POSITION" == 0.0 || "$SNAPSHOT_POSITION" == 0.00* ]]; then
+      SNAPSHOT_POSITION="0.001"
+    fi
+    # Very high values: cap to 0.999 (can't be 1.0)
+    if [[ "$SNAPSHOT_POSITION" == 0.9999* || "$SNAPSHOT_POSITION" == 0.99999* ]]; then
+      SNAPSHOT_POSITION="0.999"
+    fi
+    # If someone passes 0.999999 etc that's fine, we'll just rely on gource rounding but ensure <1
+    if [[ "$SNAPSHOT_POSITION" == 1* ]]; then
+      SNAPSHOT_POSITION="0.999"
+    fi
+  fi
   case "$SNAPSHOT_MODE" in
     latest)
-      # Jump to end of simulation to show most recent commit state
-      start_position="--start-position 1.0"
+      # Jump to (almost) end of simulation to show most recent commit state
+      start_position="--start-position 0.999"
       ;;
     start|earliest)
-      start_position="--start-position 0.0"
+      # Can't be exactly 0.0 (non-inclusive range), so use a tiny positive value
+      start_position="--start-position 0.001"
       ;;
     percent)
       start_position="--start-position ${SNAPSHOT_POSITION}"
       ;;
     *)
-      start_position="--start-position 1.0"
+      start_position="--start-position 0.999"
       ;;
   esac
   # Make sure idle items don't fade away before we snapshot
