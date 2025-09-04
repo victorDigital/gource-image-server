@@ -77,7 +77,6 @@ render_image () {
     gource '$REPO_DIR' \
       --output-ppm-stream - \
       --stop-at-end \
-      --stop-at-time 0 \
       '-${WIDTH}x${HEIGHT}' \
       $gource_extra_opts \
       ${GOURCE_OPTS}
