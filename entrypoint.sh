@@ -10,6 +10,10 @@ GIT_BRANCH="${GIT_BRANCH:-main}"
 INTERVAL_SECONDS="${INTERVAL_SECONDS:-600}"
 WIDTH="${WIDTH:-1920}"
 HEIGHT="${HEIGHT:-1080}"
+# Snapshot strategy: latest (default) | start | percent (0.0-1.0)
+SNAPSHOT_MODE="${SNAPSHOT_MODE:-latest}"
+# If SNAPSHOT_MODE=percent, use SNAPSHOT_POSITION (0.0 - 1.0)
+SNAPSHOT_POSITION="${SNAPSHOT_POSITION:-0.9}"
 
 # --- Pre-flight Checks ---
 if [[ -z "$GIT_URL" ]]; then
@@ -57,22 +61,29 @@ render_image () {
 
   echo "[render] Starting gource visualization..."
   
-  # Get the date range for better visualization
-  local first_commit_date=$(git -C "$REPO_DIR" log --reverse --format="%ci" --max-count=1 2>/dev/null || echo "")
-  local last_commit_date=$(git -C "$REPO_DIR" log -1 --format="%ci" 2>/dev/null || echo "")
-  
-  # Determine if we should focus on recent activity
+  # Determine snapshot strategy (we only need a single representative frame, not an animation)
   local gource_extra_opts=""
-  if [[ -n "$last_commit_date" ]]; then
-    # Focus on last 6 months if repository is older
-    local six_months_ago=$(date -d "6 months ago" "+%Y-%m-%d" 2>/dev/null || date -v-6m "+%Y-%m-%d" 2>/dev/null || echo "")
-    if [[ -n "$six_months_ago" ]]; then
-      gource_extra_opts="--start-date '$six_months_ago'"
-      echo "[render] Focusing on commits from $six_months_ago onwards"
-    fi
-  fi
+  local start_position=""
+  case "$SNAPSHOT_MODE" in
+    latest)
+      # Jump to end of simulation to show most recent commit state
+      start_position="--start-position 1.0"
+      ;;
+    start|earliest)
+      start_position="--start-position 0.0"
+      ;;
+    percent)
+      start_position="--start-position ${SNAPSHOT_POSITION}"
+      ;;
+    *)
+      start_position="--start-position 1.0"
+      ;;
+  esac
+  # Make sure idle items don't fade away before we snapshot
+  gource_extra_opts+=" ${start_position} --file-idle-time 0"
+  echo "[render] Snapshot mode: $SNAPSHOT_MODE ($start_position)"
   
-  # Run gource with improved settings for recent activity
+  # Run gource positioned at desired progress and capture the resulting first frame (which now represents that point)
   xvfb-run -a -s "-screen 0 ${WIDTH}x${HEIGHT}x24" bash -c "
     gource '$REPO_DIR' \
       --output-ppm-stream - \
