@@ -1,31 +1,25 @@
 # --------------------------------------------------------------------
 # Gource Image Server (Debian-based)
 # --------------------------------------------------------------------
-# Using bookworm as it has more recent packages.
 FROM debian:bookworm-slim
 
 # ---- Packages ----
-# Added 'xvfb' to provide a virtual display for gource.
+# FIX: Added 'xauth' package, which is a dependency for xvfb-run.
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-      gource ffmpeg git nginx bash ca-certificates xvfb && \
-    # Clean up the default nginx site to avoid 'conflicting server name' warnings
+      gource ffmpeg git nginx bash ca-certificates xvfb xauth && \
     rm -f /etc/nginx/sites-enabled/default && \
     rm -rf /var/lib/apt/lists/*
 
 # ---- App layout and Configuration ----
-# These variables control the behavior of the server.
 ENV REPO_DIR=/data/repo \
     OUT_DIR=/var/www/html \
     IMG_FILE=/var/www/html/gource.png \
     GIT_BRANCH=main \
-    # GIT_URL must be provided at runtime, e.g., -e GIT_URL="https://github.com/..."
     GIT_URL="" \
     INTERVAL_SECONDS=600 \
     WIDTH=1920 \
     HEIGHT=1080 \
-    # GOURCE_OPTS: Removed '--headless' as it's not a valid option.
-    # Customization of gource's appearance happens here.
     GOURCE_OPTS="--seconds-per-day 0.5 --auto-skip-seconds 1 \
                  --background-colour 000000 --font-size 22 \
                  --hide progress,mouse,filenames \
@@ -33,7 +27,6 @@ ENV REPO_DIR=/data/repo \
                  --max-files 0 --file-idle-time 0"
 
 # ---- NGINX Setup ----
-# Create necessary directories and set up a simple Nginx config to serve the image.
 RUN mkdir -p /run/nginx ${OUT_DIR} && \
     printf '%s\n' \
     'server {' \
@@ -41,14 +34,13 @@ RUN mkdir -p /run/nginx ${OUT_DIR} && \
     '  server_name _;' \
     '  root /var/www/html;' \
     '  autoindex off;' \
-    # Ensure browsers always fetch the latest image and update time
     '  add_header Cache-Control "no-store, must-revalidate";' \
     '  location / { try_files $uri =404; }' \
     '}' \
     > /etc/nginx/conf.d/default.conf
 
 # ---- Web Page Setup ----
-# A simple HTML page that auto-refreshes the image and the 'last updated' time.
+# (This section is unchanged)
 RUN cat > ${OUT_DIR}/index.html <<'HTML'
 <!doctype html>
 <html lang="en">
@@ -67,14 +59,12 @@ RUN cat > ${OUT_DIR}/index.html <<'HTML'
 <script>
 async function refresh() {
   const img = document.getElementById('gource-img');
-  // Add a timestamp to the URL to bypass browser cache
   img.src = 'gource.png?t=' + Date.now();
   try {
     const res = await fetch('last_update.txt', {cache:'no-store'});
     if(res.ok){ document.getElementById('last-update').textContent = await res.text(); }
   } catch(_) {}
 }
-// Refresh the image every 60 seconds.
 setInterval(refresh, 60000);
 window.addEventListener('load', refresh);
 </script>
@@ -89,7 +79,6 @@ window.addEventListener('load', refresh);
 HTML
 
 # ---- Entrypoint Script ----
-# This script manages the git repo and the render loop.
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
