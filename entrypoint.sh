@@ -33,7 +33,7 @@ analyze_repo() {
   local repo_path="$1"
   local commit_count=$(git -C "$repo_path" rev-list --count HEAD 2>/dev/null || echo "0")
   local latest_commit=$(git -C "$repo_path" log -1 --format="%h %s (%cr)" 2>/dev/null || echo "No commits")
-  local authors_count=$(git -C "$repo_path" shortlog -sn | wc -l 2>/dev/null || echo "0")
+  local authors_count=$(git -C "$repo_path" shortlog -sn --all | wc -l 2>/dev/null || echo "0")
   local first_commit=$(git -C "$repo_path" log --reverse --format="%ci" --max-count=1 2>/dev/null || echo "Unknown")
   local last_commit=$(git -C "$repo_path" log -1 --format="%ci" 2>/dev/null || echo "Unknown")
   

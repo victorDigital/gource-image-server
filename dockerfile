@@ -25,11 +25,9 @@ ENV REPO_DIR=/data/repo \
                  --background-colour 000000 \
                  --font-size 18 \
                  --hide progress,mouse \
-                 --show-filenames \
                  --highlight-users \
                  --max-files 1000 \
                  --file-idle-time 30 \
-                 --user-image-dir /tmp \
                  --date-format '%Y-%m-%d %H:%M' \
                  --title 'Repository Activity'"
 
